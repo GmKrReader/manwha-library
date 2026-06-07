@@ -5,6 +5,7 @@ from collections import defaultdict
 from rapidfuzz import fuzz
 import unicodedata
 
+
 # =====================
 # CONFIG
 # =====================
@@ -14,11 +15,71 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# =====================
+# AUTH
+# =====================
+def login_user(email, password):
+    try:
+        result = supabase.auth.sign_in_with_password({
+            "email": email,
+            "password": password
+        })
+
+        if result.user:
+            st.session_state["authenticated"] = True
+            st.session_state["user"] = result.user.email
+            return True
+
+        return False
+
+    except Exception as e:
+        st.error(f"Login error: {str(e)}")
+        return False
+
+
+def logout_user():
+    try:
+        supabase.auth.sign_out()
+    except:
+        pass
+
+    st.session_state.clear()
+    st.rerun()
+
+
+def show_login():
+    st.title("📚 Biblioteca Manhwa")
+
+    st.markdown("### 🔐 Iniciar sesión")
+
+    email = st.text_input("Correo")
+    password = st.text_input("Contraseña", type="password")
+
+    if st.button("Ingresar", use_container_width=True):
+
+        if not email or not password:
+            st.warning("Completa todos los campos")
+            return
+
+        if login_user(email, password):
+            st.success("Acceso concedido")
+            st.rerun()
+        else:
+            st.error("Correo o contraseña incorrectos")
+
+
+if "authenticated" not in st.session_state:
+    st.session_state["authenticated"] = False
+
 if "add_step" not in st.session_state:
     st.session_state["add_step"] = "input"
 
 if "parsed_works_cache" not in st.session_state:
     st.session_state["parsed_works_cache"] = None
+
+if not st.session_state["authenticated"]:
+    show_login()
+    st.stop()
 
 # =====================
 # CSS RESPONSIVO CON SOPORTE DARK MODE
@@ -155,7 +216,6 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
-
 # =====================
 # SAFE FUNCTIONS
 # =====================
@@ -369,6 +429,7 @@ def show_add_works_modal():
     # =========================
     # INIT STATE
     # =========================
+    
     if "add_step" not in st.session_state:
         st.session_state["add_step"] = "input"
 
@@ -772,6 +833,13 @@ def show_edit_form(work, edit_id):
 # SIDEBAR
 # =====================
 st.sidebar.title("📚 Biblioteca")
+st.sidebar.success(
+    f"👤 {st.session_state.get('user','Usuario')}"
+)
+
+if st.sidebar.button("🚪 Cerrar sesión"):
+    logout_user()
+    
 st.sidebar.markdown("---")
 
 # Botón para agregar obras
