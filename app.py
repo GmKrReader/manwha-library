@@ -272,23 +272,39 @@ def parse_bulk_input(input_text: str) -> list:
     - Obra1 / alias1 / alias2
     - Obra2
     - Obra3 / alias3
+    
+    Mejorado para manejar correctamente los separadores y espacios
     """
     works = []
     lines = input_text.strip().split('\n')
     
-    for line in lines:
+    for line_num, line in enumerate(lines, 1):
         line = line.strip()
         if not line:
             continue
         
-        parts = [p.strip() for p in line.split('/')]
+        # Dividir por '/' y limpiar cada parte
+        # Importante: split('/') mantiene la integridad de cada parte
+        parts = line.split('/')
         
-        if parts:
-            work_info = {
-                "title": parts[0],
-                "aliases": parts[1:] if len(parts) > 1 else []
-            }
-            works.append(work_info)
+        # Limpiar cada parte (eliminar espacios al inicio y final)
+        cleaned_parts = [part.strip() for part in parts if part.strip()]
+        
+        if cleaned_parts:
+            # La primera parte es el título principal
+            title = cleaned_parts[0]
+            # El resto son aliases (si hay más de una parte)
+            aliases = cleaned_parts[1:] if len(cleaned_parts) > 1 else []
+            
+            # Validar que el título no esté vacío
+            if title:
+                work_info = {
+                    "title": title,
+                    "aliases": aliases
+                }
+                works.append(work_info)
+            else:
+                st.warning(f"Línea {line_num}: Título vacío después de limpiar")
     
     return works
 
@@ -570,13 +586,20 @@ def show_add_works_modal():
             for d in duplicates_in_list:
                 st.write(f"- {d}")
 
+        # En la sección de resultados, mejora la visualización:
         if new_works:
             st.success(f"✅ Nuevas obras ({len(new_works)}):")
-
+            
             for w in new_works:
                 smut_badge = " 🔞" if w["smut"] else ""
-                aliases_txt = " / ".join(w["aliases"]) if w["aliases"] else ""
-                st.write(f"- {w['title']}{smut_badge} {aliases_txt}")
+                
+                # Mostrar título y aliases correctamente formateados
+                if w["aliases"]:
+                    aliases_display = f" → Aliases: {', '.join(w['aliases'])}"
+                else:
+                    aliases_display = ""
+                
+                st.write(f"- **{w['title']}**{smut_badge}{aliases_display}")
 
         # =========================
         # ACTIONS
