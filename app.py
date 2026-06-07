@@ -763,6 +763,31 @@ def show_edit_form(work, edit_id):
             )
             
             st.markdown("---")
+            st.markdown("### 📊 Estado de Publicación")
+            
+            # Obtener el valor actual de publication_status
+            current_publication_status = work.get("publication_status", "ONGOING")
+            # Si es None o está vacío, por defecto ONGOING
+            if pd.isna(current_publication_status) or not current_publication_status:
+                current_publication_status = "ONGOING"
+            
+            # Checkbox: True = COMPLETED, False = ONGOING
+            is_completed = current_publication_status == "COMPLETED"
+            
+            publication_completed = st.checkbox(
+                "✅ **Obra completada** (marcar si la publicación ha finalizado)",
+                value=is_completed,
+                help="Si la obra ya no se publica más capítulos, marca esta casilla",
+                key=f"publication_{edit_id}"
+            )
+            
+            # Mostrar el estado actual de forma visual
+            if publication_completed:
+                st.success("📗 Estado: COMPLETED - La publicación de la obra ha finalizado")
+            else:
+                st.info("📘 Estado: ONGOING - La obra sigue en publicación")
+            
+            st.markdown("---")
             st.markdown("### 🖼️ Portada")
             
             cover_url = st.text_input(
@@ -807,6 +832,9 @@ def show_edit_form(work, edit_id):
         if save:
             try:
                 with st.spinner("Guardando cambios..."):
+                    # Determinar el publication_status basado en el checkbox
+                    publication_status = "COMPLETED" if publication_completed else "ONGOING"
+                    
                     supabase.table("works").update({
                         "title": title,
                         "personal_rating": rating,
@@ -815,7 +843,8 @@ def show_edit_form(work, edit_id):
                         "cover_url": cover_url if cover_url else None,
                         "favorite": favorite,
                         "review": review if review else None,
-                        "smut": smut
+                        "smut": smut,
+                        "publication_status": publication_status  # Nuevo campo
                     }).eq("id", edit_id).execute()
                     
                     supabase.table("aliases").delete().eq("work_id", edit_id).execute()
@@ -893,10 +922,17 @@ favorite_only = st.sidebar.checkbox("⭐ Solo favoritos")
 
 smut_filter = st.sidebar.checkbox("🔞 Solo +18")
 
+
 status_filter = st.sidebar.selectbox(
     "📌 Estado personal",
     options=["Todos", "READING", "PLANNED", "COMPLETED"],
     help="Filtrar por estado de lectura"
+)
+
+publication_filter = st.sidebar.selectbox(
+    "📌📄 Estado de publicación",
+    options=["Todos", "ONGOING", "COMPLETED"],
+    help="Filtrar por estado de publicación"
 )
 
 items_per_page = st.sidebar.selectbox(
@@ -957,6 +993,9 @@ if smut_filter:
 
 if status_filter != "Todos":
     df_filtered = df_filtered[df_filtered["personal_status"] == status_filter]
+
+if publication_filter != "Todos":
+    df_filtered = df_filtered[df_filtered["publication_status"] == publication_filter]    
 
 # =====================
 # EDIT SECTION (ARRIBA)
@@ -1038,6 +1077,16 @@ else:
                         st.markdown('<span class="badge badge-favorite">⭐ Favorito</span>', unsafe_allow_html=True)
                     if work.get("smut"):
                         st.markdown('<span class="badge badge-smut">🔞 +18</span>', unsafe_allow_html=True)
+                    
+                    # Badge para estado de publicación (NUEVO)
+                    publication_status = work.get("publication_status", "ONGOING")
+                    if pd.isna(publication_status) or not publication_status:
+                        publication_status = "ONGOING"
+                    
+                    if publication_status == "COMPLETED":
+                        st.markdown('<span class="badge" style="background-color: #10b981; color: white;">✅ Publicación Completada</span>', unsafe_allow_html=True)
+                    else:
+                        st.markdown('<span class="badge" style="background-color: #3b82f6; color: white;">🔄 En publicación</span>', unsafe_allow_html=True)
                 
                 with col_rating:
                     rating_display = clean(work.get('personal_rating'))
@@ -1055,17 +1104,18 @@ else:
                             "PLANNED": "📅", 
                             "COMPLETED": "✅"
                         }.get(status_display, "📌")
-                        st.markdown(f"**{status_emoji} Estado:** {status_display}")
+                        st.markdown(f"**{status_emoji} Estado personal:** {status_display}")
                     else:
-                        st.markdown("**📌 Estado:** Sin especificar")
+                        st.markdown("**📌 Estado personal:** Sin especificar")
                 
                 with col2:
                     chapters_count = clean(work.get('chapter_count'))
-                    st.markdown(f"**📑 Capítulos:** {chapters_count if chapters_count else '0'}")
+                    st.markdown(f"**📑 Capítulos leídos:** {chapters_count if chapters_count else '0'}")
                 
                 with col3:
-                    if work.get("favorite"):
-                        st.markdown("**⭐ Favorito**")
+                    # Mostrar también el publication_status en texto para claridad
+                    pub_status_text = "Completada" if publication_status == "COMPLETED" else "En publicación"
+                    st.markdown(f"**📅 Publicación:** {pub_status_text}")
                 
                 review = clean(work.get("review"))
                 if isinstance(review, str) and review.strip():
@@ -1097,7 +1147,6 @@ else:
                     st.session_state["edit_work"] = work.get("id")
                     st.session_state["current_page"] = current_page
                     st.rerun()
-
 # =====================
 # FOOTER
 # =====================
